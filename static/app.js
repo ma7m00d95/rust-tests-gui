@@ -6,6 +6,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const runBtn = document.getElementById('runBtn');
     const clearBtn = document.getElementById('clearBtn');
     
+    const taskSection = document.getElementById('taskSection');
+    const taskHeader = document.getElementById('taskHeader');
+    const taskText = document.getElementById('taskText');
+    
     // Toggles
     const verboseToggle = document.getElementById('verboseToggle');
     const formatToggle = document.getElementById('formatToggle');
@@ -38,13 +42,32 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    function selectExercise(name) {
+    async function selectExercise(name) {
         selectedExercise = name;
         currentExerciseName.textContent = name;
         document.querySelectorAll('.exercise-item').forEach(el => {
             el.classList.toggle('active', el.textContent === name);
         });
+
+        // Load instructions
+        try {
+            const response = await fetch(`/api/instructions?exercise=${name}`);
+            const data = await response.json();
+            taskText.textContent = data.instructions;
+            // Auto-expand if instructions are found
+            if (data.instructions && !data.instructions.includes("No specific instructions")) {
+                taskSection.classList.remove('collapsed');
+            } else {
+                taskSection.classList.add('collapsed');
+            }
+        } catch (err) {
+            taskText.textContent = "Failed to load instructions.";
+        }
     }
+
+    taskHeader.onclick = () => {
+        taskSection.classList.toggle('collapsed');
+    };
 
     function logToTerminal(text, type = '') {
         const div = document.createElement('div');
@@ -93,7 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
         });
 
         eventSource.addEventListener('error', (e) => {
-            logToTerminal(`Error: ${e.data}`, 'error');
+            if (e.data) {
+                logToTerminal(`Error: ${e.data}`, 'error');
+            } else if (eventSource.readyState === EventSource.CLOSED) {
+                logToTerminal('Connection closed.', 'info');
+            }
             eventSource.close();
         });
 

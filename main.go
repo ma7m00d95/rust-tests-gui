@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strings"
 
 	"github.com/labstack/echo/v4"
@@ -16,6 +17,11 @@ import (
 
 type Exercise struct {
 	Name string `json:"name"`
+}
+
+type InstructionResponse struct {
+	Content string `json:"instructions"`
+	Source  string `json:"source"`
 }
 
 func main() {
@@ -33,13 +39,58 @@ func main() {
 			return c.JSON(http.StatusInternalServerError, map[string]string{"error": err.Error()})
 		}
 
-		exercises := []Exercise{}
+		var exercises []Exercise
 		for _, entry := range entries {
 			if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
 				exercises = append(exercises, Exercise{Name: entry.Name()})
 			}
 		}
+
+		sort.Slice(exercises, func(i, j int) bool {
+			return exercises[i].Name < exercises[j].Name
+		})
 		return c.JSON(http.StatusOK, exercises)
+	})
+
+	e.GET("/api/instructions", func(c echo.Context) error {
+		exercise := c.QueryParam("exercise")
+		if exercise == "" {
+			return c.JSON(http.StatusBadRequest, map[string]string{"error": "No exercise specified"})
+		}
+
+		// 1. Try subjects/questions directory for markdown files
+		subjectPath := filepath.Join("subjects", "questions", exercise+".md")
+		data, err := os.ReadFile(subjectPath)
+		if err == nil {
+			return c.JSON(http.StatusOK, InstructionResponse{
+				Content: string(data),
+				Source:  "markdown",
+			})
+		}
+
+		// 2. Fallback to test files comments
+		testFile := filepath.Join("tests", exercise+"_test", "src", "lib.rs")
+		if _, err := os.Stat(testFile); os.IsNotExist(err) {
+			testFile = filepath.Join("tests", exercise+"_test", "src", "main.rs")
+		}
+
+		testData, err := os.ReadFile(testFile)
+		if err == nil {
+			content := string(testData)
+			start := strings.Index(content, "/*")
+			end := strings.Index(content, "*/")
+			if start != -1 && end != -1 && end > start {
+				return c.JSON(http.StatusOK, InstructionResponse{
+					Content: strings.TrimSpace(content[start+2 : end]),
+					Source:  "test-comment",
+				})
+			}
+		}
+
+		return c.JSON(http.StatusOK, InstructionResponse{
+			Content: "No specific instructions found for this exercise.",
+			Source:  "fallback",
+		})
 	})
 
 	e.GET("/api/run", func(c echo.Context) error {
@@ -56,10 +107,15 @@ func main() {
 		// Smart Sync from student-solution folder
 		studentFolder := "student-solution"
 		if exercise != "" {
-			// Find the target file in the solutions folder
-			targetFile := "solutions/" + exercise + "/src/lib.rs"
-			if _, err := os.Stat("solutions/" + exercise + "/src/main.rs"); err == nil {
-				targetFile = "solutions/" + exercise + "/src/main.rs"
+			// Hybrid logic: Check subjects/answers first, then fallback to solutions
+			basePath := filepath.Join("subjects", "answers", exercise)
+			if _, err := os.Stat(basePath); os.IsNotExist(err) {
+				basePath = filepath.Join("solutions", exercise)
+			}
+
+			targetFile := filepath.Join(basePath, "src", "lib.rs")
+			if _, err := os.Stat(filepath.Join(basePath, "src", "main.rs")); err == nil {
+				targetFile = filepath.Join(basePath, "src", "main.rs")
 			}
 
 			// 1. CLEAR the original solution first to ensure we aren't testing old code
@@ -67,7 +123,7 @@ func main() {
 
 			if _, err := os.Stat(studentFolder); err == nil {
 				sendSSE(c.Response().Writer, "output", "Searching for your work in student-solution...")
-				
+
 				variations := []string{exercise, strings.ReplaceAll(exercise, "_", "-")}
 				found := false
 
@@ -88,7 +144,7 @@ func main() {
 						dirPath := filepath.Join(studentFolder, v)
 						if info, err := os.Stat(dirPath); err == nil && info.IsDir() {
 							sendSSE(c.Response().Writer, "output", fmt.Sprintf("Found your directory: %s", v))
-							
+
 							// Check if student provided a src folder or just files
 							if _, err := os.Stat(filepath.Join(dirPath, "src")); err == nil {
 								// They have a src folder, copy everything
