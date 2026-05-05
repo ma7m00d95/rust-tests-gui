@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rust Piscine Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body class="dark-mode">
+    <div class="glass-container">
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <h1>Rust Dashboard</h1>
+                <div class="search-box">
+                    <input type="text" id="exerciseSearch" placeholder="Search exercises...">
+                </div>
+            </div>
+            <ul id="exerciseList" class="exercise-list">
+                <!-- Exercises will be loaded here -->
+            </ul>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-bar">
+                <div class="active-exercise">
+                    <span id="currentExerciseName">Select an exercise</span>
+                </div>
+                <div class="controls">
+                    <button id="runBtn" class="btn primary">Run Test</button>
+                    <label class="toggle-container">
+                        <input type="checkbox" id="verboseToggle">
+                        <span class="toggle-label">Verbose</span>
+                    </label>
+                    <label class="toggle-container">
+                        <input type="checkbox" id="formatToggle">
+                        <span class="toggle-label">Format</span>
+                    </label>
+                    <label class="toggle-container">
+                        <input type="checkbox" id="clippyToggle">
+                        <span class="toggle-label">Clippy</span>
+                    </label>
+                    <button id="clearBtn" class="btn secondary">Clear</button>
+                </div>
+            </header>
+
+            <section class="terminal-container">
+                <div class="terminal-header">
+                    <div class="dots">
+                        <span></span><span></span><span></span>
+                    </div>
+                    <span class="terminal-title">Terminal Output</span>
+                </div>
+                <div id="terminal" class="terminal-body">
+                    <div class="line welcome">Ready to test...</div>
+                </div>
+            </section>
+        </main>
+    </div>
+    <script src="app.js"></script>
+</body>
+</html>
