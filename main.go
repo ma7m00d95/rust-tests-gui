@@ -59,13 +59,41 @@ func main() {
 		}
 
 		// 1. Try subjects/questions directory for markdown files
+		// First: Try exact filename match
 		subjectPath := filepath.Join("subjects", "questions", exercise+".md")
 		data, err := os.ReadFile(subjectPath)
 		if err == nil {
 			return c.JSON(http.StatusOK, InstructionResponse{
 				Content: string(data),
-				Source:  "markdown",
+				Source:  "markdown-exact",
 			})
+		}
+
+		// Second: Scan all .md files in subjects/questions for a heading matching the exercise
+		questionsRoot := filepath.Join("subjects", "questions")
+		qFiles, _ := os.ReadDir(questionsRoot)
+		for _, qf := range qFiles {
+			if !qf.IsDir() && filepath.Ext(qf.Name()) == ".md" {
+				qData, err := os.ReadFile(filepath.Join(questionsRoot, qf.Name()))
+				if err == nil {
+					qContent := string(qData)
+					// Look for the exercise name as a heading (case insensitive)
+					// We look for patterns like "## Exercise: Name" or "## Name"
+					lowerContent := strings.ToLower(qContent)
+					lowerExercise := strings.ToLower(exercise)
+					
+					// Try to find the section
+					idx := strings.Index(lowerContent, lowerExercise)
+					if idx != -1 {
+						// Found a potential match! Let's return the whole file for now, 
+						// or we could try to extract just that section.
+						return c.JSON(http.StatusOK, InstructionResponse{
+							Content: qContent,
+							Source:  "markdown-module",
+						})
+					}
+				}
+			}
 		}
 
 		// 2. Fallback to test files comments
